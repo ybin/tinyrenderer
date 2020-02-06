@@ -247,24 +247,16 @@ bool TGAImage::unload_rle_data(std::ofstream &out) {
 
 TGAColor TGAImage::get(int x, int y) {
     if (!data || x < 0 || y < 0 || x >= width || y >= height) {
-        return TGAColor();
+        return {};
     }
-    return TGAColor(data + (x + y * width) * bytespp, bytespp);
-}
-
-bool TGAImage::set(int x, int y, TGAColor &c) {
-    if (!data || x < 0 || y < 0 || x >= width || y >= height) {
-        return false;
-    }
-    memcpy(data + (x + y * width) * bytespp, c.bgra, bytespp);
-    return true;
+    return {data + (x + y * width) * bytespp, static_cast<unsigned char>(bytespp)};
 }
 
 bool TGAImage::set(int x, int y, const TGAColor &c) {
     if (!data || x < 0 || y < 0 || x >= width || y >= height) {
         return false;
     }
-    memcpy(data + (x + y * width) * bytespp, c.bgra, bytespp);
+    memcpy(data + (x + y * width) * bytespp, c.bgra, static_cast<size_t>(bytespp));
     return true;
 }
 

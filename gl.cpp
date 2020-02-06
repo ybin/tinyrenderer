@@ -48,8 +48,8 @@ Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     }
     Vec3f u = cross(s[0], s[1]);
     if (std::abs(u[2]) > 1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
-        return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
-    return Vec3f(-1, 1, 1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
+        return {1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z};
+    return {-1, 1, 1}; // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
 void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *zbuffer) {
