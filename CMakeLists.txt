@@ -8,7 +8,7 @@ include_directories(${CMAKE_CURRENT_LIST_DIR})
 set(SRC_CORE
         geometry.cpp
         model.cpp
-        our_gl.cpp
+        gl.cpp
         tgaimage.cpp)
 add_executable(tinyrenderer
         ${SRC_CORE}
