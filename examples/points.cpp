@@ -9,7 +9,7 @@ const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 
 Vec2i world2screen(Vec3f v) {
-    return Vec2i(int((v.x+1.)*width/2.), int((v.y+1.)*height/2.));
+    return {int((v.x + 1.) * width / 2.), int((v.y + 1.) * height / 2.)};
 }
 
 int main(int argc, char **argv) {

@@ -16,6 +16,8 @@ Vec3f eye(1, 1, 3);
 Vec3f center(0, 0, 0);
 Vec3f up(0, 1, 0);
 
+const TGAColor white = TGAColor(255, 255, 255, 255);
+
 struct Shader : public IShader {
     mat<2, 3, float> varying_uv;  // triangle uv coordinates, written by the vertex shader, read by the fragment shader
     mat<4, 3, float> varying_tri; // triangle coordinates (clip coordinates), written by VS, read by FS
@@ -59,6 +61,79 @@ struct Shader : public IShader {
     }
 };
 
+void render_vertex(const std::vector<std::string> &objs, const std::string &out) {
+    TGAImage frame(width, height, TGAImage::RGB);
+    for (auto &obj : objs) {
+        model = new Model(obj.data());
+        Shader shader;
+        for (int i = 0; i < model->nfaces(); i++) {
+            for (int j = 0; j < 3; j++) {
+                Vec3f v = proj<3>(shader.vertex(i, j));
+                Vec2i p = {int((v.x + 1.) * width / 2.), int((v.y + 1.) * height / 2.)};
+                frame.set(p.x, p.y, white);
+            }
+        }
+        delete model;
+    }
+    frame.flip_vertically();
+    frame.write_tga_file(out.data());
+}
+
+void render_line(const std::vector<std::string> &objs, const std::string &out) {
+    TGAImage frame(width, height, TGAImage::RGB);
+    auto line = [](int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
+        for (float t = 0.0f; t < 1.0; t += 0.01f) {
+            int x = x0 + (x1 - x0) * t;
+            int y = y0 + (y1 - y0) * t;
+            image.set(x, y, color);
+        }
+    };
+    for (auto &obj : objs) {
+        model = new Model(obj.data());
+        Shader shader;
+        for (int i = 0; i < model->nfaces(); i++) {
+            for (int j = 0; j < 3; j++) {
+                Vec4f v;
+                v = shader.vertex(i, j);
+                Vec3f v0 = proj<3>(v);
+                v = shader.vertex(i, (j + 1) % 3);
+                Vec3f v1 = proj<3>(v);
+
+                int x0 = (v0.x + 1.) * width / 2.;
+                int y0 = (v0.y + 1.) * height / 2.;
+                int x1 = (v1.x + 1.) * width / 2.;
+                int y1 = (v1.y + 1.) * height / 2.;
+                line(x0, y0, x1, y1, frame, white);
+            }
+        }
+        delete model;
+    }
+    frame.flip_vertically();
+    frame.write_tga_file(out.data());
+}
+
+void render_triangle(const std::vector<std::string> &objs, const std::string &out) {
+    auto zbuffer = std::vector<float>(width * height);
+    for (int i = width * height; i--;) {
+        zbuffer[i] = -std::numeric_limits<float>::max();
+    }
+
+    TGAImage frame(width, height, TGAImage::RGB);
+    for (auto &obj : objs) {
+        model = new Model(obj.c_str());
+        Shader shader;
+        for (int i = 0; i < model->nfaces(); i++) {
+            for (int j = 0; j < 3; j++) {
+                shader.vertex(i, j);
+            }
+            triangle(shader.varying_tri, shader, frame, zbuffer.data());
+        }
+        delete model;
+    }
+    frame.flip_vertically(); // to place the origin in the bottom left corner of the image
+    frame.write_tga_file(out.data());
+}
+
 int main(int argc, char **argv) {
     std::vector<std::string> objs;
 
@@ -74,32 +149,15 @@ int main(int argc, char **argv) {
         }
     }
 
-    auto *zbuffer = new float[width * height];
-    for (int i = width * height; i--;) {
-        zbuffer[i] = -std::numeric_limits<float>::max();
-    }
-
-    TGAImage frame(width, height, TGAImage::RGB);
     lookat(eye, center, up);
     viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
     projection(-1.f / (eye - center).norm());
     light_dir = proj<3>(Projection * ModelView * embed<4>(light_dir, 0.f)).normalize();
 
-    for (auto &obj : objs) {
-        model = new Model(obj.c_str());
-        Shader shader;
-        for (int i = 0; i < model->nfaces(); i++) {
-            for (int j = 0; j < 3; j++) {
-                shader.vertex(i, j);
-            }
-            triangle(shader.varying_tri, shader, frame, zbuffer);
-        }
-        delete model;
-    }
-    frame.flip_vertically(); // to place the origin in the bottom left corner of the image
-    frame.write_tga_file("framebuffer.tga");
+    render_triangle(objs, "triangle.tga");
+    render_line(objs, "line.tga");
+    render_vertex(objs, "vertex.tga");
 
-    delete[] zbuffer;
     return 0;
 }
 
