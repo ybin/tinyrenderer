@@ -126,6 +126,28 @@ void render_triangle(const std::vector<std::string> &objs, const std::string &ou
             for (int j = 0; j < 3; j++) {
                 shader.vertex(i, j);
             }
+            triangle(shader.varying_tri, shader, frame, zbuffer.data(), false);
+        }
+        delete model;
+    }
+    frame.flip_vertically(); // to place the origin in the bottom left corner of the image
+    frame.write_tga_file(out.data());
+}
+
+void render_triangle_colored(const std::vector<std::string> &objs, const std::string &out) {
+    auto zbuffer = std::vector<float>(width * height);
+    for (int i = width * height; i--;) {
+        zbuffer[i] = -std::numeric_limits<float>::max();
+    }
+
+    TGAImage frame(width, height, TGAImage::RGB);
+    for (auto &obj : objs) {
+        model = new Model(obj.c_str());
+        Shader shader;
+        for (int i = 0; i < model->nfaces(); i++) {
+            for (int j = 0; j < 3; j++) {
+                shader.vertex(i, j);
+            }
             triangle(shader.varying_tri, shader, frame, zbuffer.data());
         }
         delete model;
@@ -154,9 +176,10 @@ int main(int argc, char **argv) {
     projection(-1.f / (eye - center).norm());
     light_dir = proj<3>(Projection * ModelView * embed<4>(light_dir, 0.f)).normalize();
 
-    render_triangle(objs, "triangle.tga");
-    render_line(objs, "line.tga");
     render_vertex(objs, "vertex.tga");
+    render_line(objs, "line.tga");
+    render_triangle(objs, "triangle.tga");
+    render_triangle_colored(objs, "triangle_colored.tga");
 
     return 0;
 }

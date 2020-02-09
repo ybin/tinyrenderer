@@ -19,4 +19,4 @@ struct IShader {
 };
 
 //void triangle(Vec4f *pts, IShader &shader, TGAImage &image, float *zbuffer);
-void triangle(mat<4, 3, float> &pts, IShader &shader, TGAImage &image, float *zbuffer);
+void triangle(mat<4, 3, float> &pts, IShader &shader, TGAImage &image, float *zbuffer, bool colored = true);

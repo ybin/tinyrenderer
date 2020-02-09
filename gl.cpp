@@ -52,7 +52,7 @@ Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     return {-1, 1, 1}; // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *zbuffer) {
+void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
     mat<3, 4, float> pts = (Viewport * clipc).transpose(); // transposed to ease access to each of the points
     mat<3, 2, float> pts2;
     for (int i = 0; i < 3; i++) pts2[i] = proj<2>(pts[i] / pts[i][3]);
@@ -68,6 +68,7 @@ void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *
     }
     Vec2i P;
     TGAColor color;
+    TGAColor white = {255, 255, 255, 255};
     for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x++) {
         for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++) {
             Vec3f bc_screen = barycentric(pts2[0], pts2[1], pts2[2], P);
@@ -80,7 +81,7 @@ void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *
             bool discard = shader.fragment(bc_clip, color);
             if (!discard) {
                 zbuffer[P.x + P.y * image.get_width()] = frag_depth;
-                image.set(P.x, P.y, color);
+                image.set(P.x, P.y, colored ? color : white);
             }
         }
     }
