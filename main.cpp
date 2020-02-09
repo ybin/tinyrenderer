@@ -6,6 +6,8 @@
 #include "geometry.h"
 #include "gl.h"
 
+#define CLAMP(t) ((t > 1.f) ? 1.f : ((t < 0.f) ? 0.f : t))
+
 Model *model = NULL;
 
 const int width = 800;
@@ -18,7 +20,7 @@ Vec3f up(0, 1, 0);
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 
-struct Shader : public IShader {
+struct Shader0 : public IShader {
     mat<2, 3, float> varying_uv;  // triangle uv coordinates, written by the vertex shader, read by the fragment shader
     mat<4, 3, float> varying_tri; // triangle coordinates (clip coordinates), written by VS, read by FS
     mat<3, 3, float> varying_nrm; // normal per vertex to be interpolated by FS
@@ -61,6 +63,47 @@ struct Shader : public IShader {
     }
 };
 
+struct Shader : public IShader {
+    Vec3f varying_intensity; // write by vertex shader, read by fragment shader
+    mat<2, 3, float> varying_uv; // write by vertex shader, read by fragment shader
+
+    virtual Vec4f vertex(int iface, int nthvert) {
+        varying_uv.set_col(nthvert, model->uv(iface, nthvert));
+        varying_intensity[nthvert] = CLAMP(model->normal(iface, nthvert) * light_dir); // diffuse light intensity
+        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from obj file
+        return Viewport * Projection * ModelView * gl_Vertex;
+    }
+
+    virtual bool fragment(Vec3f bar, TGAColor &color) {
+        float intensity = varying_intensity * bar; //interpolate intensity for current Pixel
+        Vec2f uv = varying_uv * bar; //interpolate uv for current Pixel
+        color = model->diffuse(uv) * intensity;
+        return false; // do not discard pixel
+    }
+};
+
+struct Shader1 : public IShader {
+    mat<2, 3, float> varying_uv; // write by vertex shader, read by fragment shader
+    mat<4, 4, float> uniform_M = Projection * ModelView;; //Projection*ModelView
+    mat<4, 4, float> uniform_MIT = (Projection *
+                                    ModelView).invert_transpose();; // (Projection*ModelView).invert_transpose()
+
+    virtual Vec4f vertex(int iface, int nthvert) {
+        varying_uv.set_col(nthvert, model->uv(iface, nthvert));
+        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from obj file
+        return Viewport * Projection * ModelView * gl_Vertex; // transform to screen coords
+    }
+
+    virtual bool fragment(Vec3f bar, TGAColor &color) {
+        Vec2f uv = varying_uv * bar; //interpolate uv for current Pixel
+        Vec3f n = proj<3>(uniform_MIT * embed<4>(model->normal(uv))).normalize(); // transform normal vector
+        Vec3f l = proj<3>(uniform_M * embed<4>(light_dir)).normalize(); // transfrom light direction
+        float intensity = std::max(0.f, n * l);
+        color = model->diffuse(uv) * intensity; //uv
+        return false; // do not discard pixel
+    }
+};
+
 void render_vertex(const std::vector<std::string> &objs, const std::string &out) {
     TGAImage frame(width, height, TGAImage::RGB);
     for (auto &obj : objs) {
@@ -68,8 +111,8 @@ void render_vertex(const std::vector<std::string> &objs, const std::string &out)
         Shader shader;
         for (int i = 0; i < model->nfaces(); i++) {
             for (int j = 0; j < 3; j++) {
-                Vec3f v = proj<3>(shader.vertex(i, j));
-                Vec2i p = {int((v.x + 1.) * width / 2.), int((v.y + 1.) * height / 2.)};
+                Vec4f v = shader.vertex(i, j);
+                Vec2i p = proj<2>(v / v[3]);
                 frame.set(p.x, p.y, white);
             }
         }
@@ -95,15 +138,11 @@ void render_line(const std::vector<std::string> &objs, const std::string &out) {
             for (int j = 0; j < 3; j++) {
                 Vec4f v;
                 v = shader.vertex(i, j);
-                Vec3f v0 = proj<3>(v);
+                Vec2i v0 = proj<2>(v / v[3]);
                 v = shader.vertex(i, (j + 1) % 3);
-                Vec3f v1 = proj<3>(v);
+                Vec2i v1 = proj<2>(v / v[3]);
 
-                int x0 = (v0.x + 1.) * width / 2.;
-                int y0 = (v0.y + 1.) * height / 2.;
-                int x1 = (v1.x + 1.) * width / 2.;
-                int y1 = (v1.y + 1.) * height / 2.;
-                line(x0, y0, x1, y1, frame, white);
+                line(v0.x, v0.y, v1.x, v1.y, frame, white);
             }
         }
         delete model;
@@ -113,20 +152,17 @@ void render_line(const std::vector<std::string> &objs, const std::string &out) {
 }
 
 void render_triangle(const std::vector<std::string> &objs, const std::string &out) {
-    auto zbuffer = std::vector<float>(width * height);
-    for (int i = width * height; i--;) {
-        zbuffer[i] = -std::numeric_limits<float>::max();
-    }
-
     TGAImage frame(width, height, TGAImage::RGB);
+    TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
     for (auto &obj : objs) {
         model = new Model(obj.c_str());
         Shader shader;
         for (int i = 0; i < model->nfaces(); i++) {
+            Vec4f screen_coords[3];
             for (int j = 0; j < 3; j++) {
-                shader.vertex(i, j);
+                screen_coords[j] = shader.vertex(i, j);
             }
-            triangle(shader.varying_tri, shader, frame, zbuffer.data(), false);
+            triangle(screen_coords, shader, frame, zbuffer, false);
         }
         delete model;
     }
@@ -135,20 +171,17 @@ void render_triangle(const std::vector<std::string> &objs, const std::string &ou
 }
 
 void render_triangle_colored(const std::vector<std::string> &objs, const std::string &out) {
-    auto zbuffer = std::vector<float>(width * height);
-    for (int i = width * height; i--;) {
-        zbuffer[i] = -std::numeric_limits<float>::max();
-    }
-
     TGAImage frame(width, height, TGAImage::RGB);
+    TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
     for (auto &obj : objs) {
         model = new Model(obj.c_str());
         Shader shader;
         for (int i = 0; i < model->nfaces(); i++) {
+            Vec4f screen_coords[3];
             for (int j = 0; j < 3; j++) {
-                shader.vertex(i, j);
+                screen_coords[j] = shader.vertex(i, j);
             }
-            triangle(shader.varying_tri, shader, frame, zbuffer.data());
+            triangle(screen_coords, shader, frame, zbuffer);
         }
         delete model;
     }
@@ -174,7 +207,8 @@ int main(int argc, char **argv) {
     lookat(eye, center, up);
     viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
     projection(-1.f / (eye - center).norm());
-    light_dir = proj<3>(Projection * ModelView * embed<4>(light_dir, 0.f)).normalize();
+//    light_dir = proj<3>(Projection * ModelView * embed<4>(light_dir, 0.f)).normalize();
+    light_dir.normalize();
 
     render_vertex(objs, "vertex.tga");
     render_line(objs, "line.tga");
