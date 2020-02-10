@@ -10,6 +10,9 @@ struct Shader0 : public IShader {
     mat<3, 3, float> ndc_tri;     // triangle in normalized device coordinates
     Model *model = nullptr;
     Vec3f light_dir = {1, 1, 1};
+    Matrix ModelView;
+    Matrix Viewport;
+    Matrix Projection;
 
     Vec4f vertex(int iface, int nthvert) override {
         varying_uv.set_col(nthvert, model->uv(iface, nthvert));
@@ -54,15 +57,18 @@ struct Shader : public IShader {
     mat<2, 3, float> varying_uv; // write by vertex shader, read by fragment shader
     Model *model = nullptr;
     Vec3f light_dir = {1, 1, 1};
+    Matrix ModelView;
+    Matrix Viewport;
+    Matrix Projection;
 
-    virtual Vec4f vertex(int iface, int nthvert) {
+    Vec4f vertex(int iface, int nthvert) override {
         varying_uv.set_col(nthvert, model->uv(iface, nthvert));
         varying_intensity[nthvert] = CLAMP(model->normal(iface, nthvert) * light_dir); // diffuse light intensity
         Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from obj file
         return Viewport * Projection * ModelView * gl_Vertex;
     }
 
-    virtual bool fragment(Vec3f bar, TGAColor &color) {
+    bool fragment(Vec3f bar, TGAColor &color) override {
         float intensity = varying_intensity * bar; //interpolate intensity for current Pixel
         Vec2f uv = varying_uv * bar; //interpolate uv for current Pixel
         color = model->diffuse(uv) * intensity;

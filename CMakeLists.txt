@@ -9,6 +9,7 @@ set(SRC_CORE
         geometry.cpp
         model.cpp
         gl.cpp
+        mat.cpp
         tgaimage.cpp)
 add_executable(tinyrenderer
         ${SRC_CORE}

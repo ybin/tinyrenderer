@@ -3,42 +3,6 @@
 #include <cstdlib>
 #include "gl.h"
 
-Matrix ModelView;
-Matrix Viewport;
-Matrix Projection;
-
-IShader::~IShader() {}
-
-void viewport(int x, int y, int w, int h) {
-    Viewport = Matrix::identity();
-    Viewport[0][3] = x + w / 2.f;
-    Viewport[1][3] = y + h / 2.f;
-    Viewport[2][3] = 255 / 2.f;
-    Viewport[0][0] = w / 2.f;
-    Viewport[1][1] = h / 2.f;
-    Viewport[2][2] = 255 / 2.f;
-}
-
-void projection(float coeff) {
-    Projection = Matrix::identity();
-    Projection[3][2] = coeff;
-}
-
-void lookat(Vec3f eye, Vec3f center, Vec3f up) {
-    Vec3f z = (eye - center).normalize();
-    Vec3f x = cross(up, z).normalize();
-    Vec3f y = cross(z, x).normalize();
-    Matrix Minv = Matrix::identity();
-    Matrix Tr = Matrix::identity();
-    for (int i = 0; i < 3; i++) {
-        Minv[0][i] = x[i];
-        Minv[1][i] = y[i];
-        Minv[2][i] = z[i];
-        Tr[i][3] = -center[i];
-    }
-    ModelView = Minv * Tr;
-}
-
 Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     Vec3f s[2];
     for (int i = 2; i--;) {
@@ -76,13 +40,14 @@ void triangle(Vec4f *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer, b
             if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer.get(P.x, P.y)[0] > frag_depth) continue;
             bool discard = shader.fragment(c, color);
             if (!discard) {
-                zbuffer.set(P.x, P.y, TGAColor(frag_depth));
+                zbuffer.set(P.x, P.y, TGAColor(static_cast<unsigned char>(frag_depth)));
                 image.set(P.x, P.y, colored ? color : white);
             }
         }
     }
 }
 
+/*
 void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
     mat<3, 4, float> pts = (Viewport * clipc).transpose(); // transposed to ease access to each of the points
     mat<3, 2, float> pts2;
@@ -117,4 +82,5 @@ void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *
         }
     }
 }
+*/
 
