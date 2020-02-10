@@ -1,6 +1,7 @@
 #pragma once
 
 #include "geometry.h"
+
 #define CLAMP(t) ((t > 1.f) ? 1.f : ((t < 0.f) ? 0.f : t))
 
 struct Shader0 : public IShader {
@@ -52,20 +53,28 @@ struct Shader0 : public IShader {
     }
 };
 
-struct Shader : public IShader {
+class Shader : public IShader {
+private:
     Vec3f varying_intensity; // write by vertex shader, read by fragment shader
     mat<2, 3, float> varying_uv; // write by vertex shader, read by fragment shader
     Model *model = nullptr;
     Vec3f light_dir = {1, 1, 1};
-    Matrix ModelView;
-    Matrix Viewport;
-    Matrix Projection;
+    Matrix mvp;
+
+public:
+    void set_mvp(Matrix mvp) override {
+        this->mvp = mvp;
+    }
+
+    void set_model(Model *model) override {
+        this->model = model;
+    }
 
     Vec4f vertex(int iface, int nthvert) override {
         varying_uv.set_col(nthvert, model->uv(iface, nthvert));
         varying_intensity[nthvert] = CLAMP(model->normal(iface, nthvert) * light_dir); // diffuse light intensity
         Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from obj file
-        return Viewport * Projection * ModelView * gl_Vertex;
+        return mvp * gl_Vertex;
     }
 
     bool fragment(Vec3f bar, TGAColor &color) override {
