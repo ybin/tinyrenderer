@@ -6,7 +6,7 @@ const TGAColor red = TGAColor(255, 0, 0, 255);
 int main(int argc, char **argv) {
     TGAImage image(10, 10, TGAImage::RGB);
     image.set(5, 3, red);
-    image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
+    image.flip_vertically();
     image.write_tga_file("point.tga");
     return 0;
 }
