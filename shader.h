@@ -53,12 +53,12 @@ struct Shader0 : public IShader {
     }
 };
 
-class Shader : public IShader {
+class GouraudShader : public IShader {
 private:
-    Vec3f varying_intensity; // write by vertex shader, read by fragment shader
-    mat<2, 3, float> varying_uv; // write by vertex shader, read by fragment shader
-    Model *model = nullptr;
+    Vec3f varying_intensity;        // write by vertex shader, read by fragment shader
+    mat<2, 3, float> varying_uv;    // write by vertex shader, read by fragment shader
     Vec3f light_dir = {1, 1, 1};
+    Model *model = nullptr;
     Matrix mvp;
 
 public:
@@ -82,5 +82,33 @@ public:
         Vec2f uv = varying_uv * bar; //interpolate uv for current Pixel
         color = model->diffuse(uv) * intensity;
         return false; // do not discard pixel
+    }
+};
+
+class NoLightShader : public IShader {
+private:
+    mat<2, 3, float> varying_uv;
+    Model *model = nullptr;
+    Matrix mvp;
+
+public:
+    void set_mvp(Matrix mvp) override {
+        this->mvp = mvp;
+    }
+
+    void set_model(Model *model) override {
+        this->model = model;
+    }
+
+    Vec4f vertex(int iface, int nthvert) override {
+        varying_uv.set_col(nthvert, model->uv(iface, nthvert));
+        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert));
+        return mvp * gl_Vertex;
+    }
+
+    bool fragment(Vec3f bar, TGAColor &color) override {
+        Vec2f uv = varying_uv * bar;
+        color = model->diffuse(uv);
+        return false;
     }
 };

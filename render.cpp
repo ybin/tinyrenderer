@@ -49,7 +49,7 @@ void render(const std::vector<std::string> objs,
 
     for (auto &obj : objs) {
         Model model(obj.data());
-        Shader shader;
+        NoLightShader shader;
         shader.set_model(&model);
         shader.set_mvp(VP * P * MV);
         std::vector<Vec4f> screen_coords(3);
