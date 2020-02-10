@@ -10,5 +10,6 @@ set(SRC_CORE
         model.cpp
         gl.cpp
         mat.cpp
+        render.cpp
         tgaimage.cpp)
 add_executable(tinyrenderer ${SRC_CORE} main.cpp)
