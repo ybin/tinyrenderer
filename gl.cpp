@@ -16,14 +16,15 @@ Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     return {-1, 1, 1}; // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-void triangle(Vec4f *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer, bool colored) {
-    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
-    Vec2f bboxmax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
-    for (int i = 0; i < 3; i++) {
+void triangle(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, TGAImage &zbuffer, bool colored) {
+    auto MAX = std::numeric_limits<float>::max();
+    Vec2f bboxmin(MAX, MAX);
+    Vec2f bboxmax(-MAX, -MAX);
+    for (auto &pt : pts) {
         for (int j = 0; j < 2; j++) {
             // x/w y/w
-            bboxmin[j] = std::min(bboxmin[j], pts[i][j] / pts[i][3]);
-            bboxmax[j] = std::max(bboxmax[j], pts[i][j] / pts[i][3]);
+            bboxmin[j] = std::min(bboxmin[j], pt[j] / pt[3]);
+            bboxmax[j] = std::max(bboxmax[j], pt[j] / pt[3]);
         }
     }
 
@@ -32,8 +33,10 @@ void triangle(Vec4f *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer, b
     TGAColor white = {255, 255, 255, 255};
     for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x++) {
         for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++) {
-            Vec3f c = barycentric(proj<2>(pts[0] / pts[0][3]), proj<2>(pts[1] / pts[1][3]),
-                                  proj<2>(pts[2] / pts[2][3]), P);
+            Vec3f c = barycentric(proj<2>(pts[0] / pts[0][3]),
+                                  proj<2>(pts[1] / pts[1][3]),
+                                  proj<2>(pts[2] / pts[2][3]),
+                                  P);
             float z = pts[0][2] * c.x + pts[1][2] * c.y + pts[2][2] * c.z;
             float w = pts[0][3] * c.x + pts[1][3] * c.y + pts[2][3] * c.z;
             int frag_depth = std::max(0, std::min(255, int(z / w + .5)));
