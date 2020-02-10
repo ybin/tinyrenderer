@@ -11,18 +11,4 @@ set(SRC_CORE
         gl.cpp
         mat.cpp
         tgaimage.cpp)
-add_executable(tinyrenderer
-        ${SRC_CORE}
-        main.cpp)
-
-add_executable(point
-        ${SRC_CORE}
-        examples/point.cpp)
-
-add_executable(points
-        ${SRC_CORE}
-        examples/points.cpp)
-
-add_executable(lines
-        ${SRC_CORE}
-        examples/lines.cpp)
+add_executable(tinyrenderer ${SRC_CORE} main.cpp)
