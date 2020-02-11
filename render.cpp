@@ -7,14 +7,14 @@
 #include "shader.h"
 #include "render.h"
 
-void points_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, TGAImage &zbuffer) {
+void points_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer) {
     const TGAColor white(255, 255, 255);
     for (auto &pt : pts) {
         image.set(static_cast<int>(pt[0] / pt[3]), static_cast<int>(pt[1] / pt[3]), white);
     }
 }
 
-void line_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, TGAImage &zbuffer) {
+void line_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer) {
     const TGAColor white(255, 255, 255);
     const int len = 100;
     const float step = 1.f / len;
@@ -44,8 +44,9 @@ void render(const std::vector<std::string> objs,
     auto MV = lookat(eye, center, up);
     auto VP = viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
     auto P = projection(-1.f / (eye - center).norm());
+//    auto P = frustum(-1, 1, 1, -1, 1, 3);
     TGAImage framebuffer(width, height, TGAImage::RGB);
-    TGAImage zbuffer(width, height, TGAImage::RGB);
+    std::vector<float> zbuffer(static_cast<unsigned long>(width * height));
 
     for (auto &obj : objs) {
         Model model(obj.data());
@@ -58,7 +59,7 @@ void render(const std::vector<std::string> objs,
             for (int j = 0; j < 3; j++) {
                 screen_coords.emplace_back(shader.vertex(i, j));
             }
-            interpolator(screen_coords, shader, framebuffer, zbuffer);
+            interpolator(screen_coords, shader, framebuffer, zbuffer.data());
         }
     }
 
