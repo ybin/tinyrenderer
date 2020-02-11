@@ -102,8 +102,8 @@ public:
 
     Vec4f vertex(int iface, int nthvert) override {
         varying_uv.set_col(nthvert, model->uv(iface, nthvert));
-        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert));
-        return mvp * gl_Vertex;
+        Vec4f gl_Vertex = mvp * embed<4>(model->vert(iface, nthvert));
+        return gl_Vertex;
     }
 
     bool fragment(Vec3f bar, TGAColor &color) override {

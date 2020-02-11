@@ -16,34 +16,33 @@ Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     return {-1, 1, 1}; // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-void triangle(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
+void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
     auto MAX = std::numeric_limits<float>::max();
-    Vec2f bboxmin(MAX, MAX);
-    Vec2f bboxmax(-MAX, -MAX);
-    for (auto &pt : pts) {
-        for (int j = 0; j < 2; j++) {
-            // x/w y/w
-            bboxmin[j] = std::min(bboxmin[j], pt[j] / pt[3]);
-            bboxmax[j] = std::max(bboxmax[j], pt[j] / pt[3]);
-        }
+    float l, t, r, b;
+    l = b = MAX;
+    t = r = -MAX;
+    for (auto &pt : screen_coords) {
+        l = std::min(l, pt.x);
+        r = std::max(r, pt.x);
+        t = std::max(t, pt.y);
+        b = std::min(b, pt.y);
     }
 
     Vec2i P;
     TGAColor color;
-    TGAColor white = {255, 255, 255, 255};
-    for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x++) {
-        for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++) {
-            Vec3f c = barycentric(proj<2>(pts[0] / pts[0][3]),
-                                  proj<2>(pts[1] / pts[1][3]),
-                                  proj<2>(pts[2] / pts[2][3]),
+    const TGAColor white = {255, 255, 255, 255};
+    for (P.x = static_cast<int>(l); P.x <= r; P.x++) {
+        for (P.y = static_cast<int>(b); P.y <= t; P.y++) {
+            Vec3f c = barycentric(proj<2>(screen_coords[0]),
+                                  proj<2>(screen_coords[1]),
+                                  proj<2>(screen_coords[2]),
                                   P);
-            float z = pts[0][2] * c.x + pts[1][2] * c.y + pts[2][2] * c.z;
-            float w = pts[0][3] * c.x + pts[1][3] * c.y + pts[2][3] * c.z;
-            float frag_depth = z / w;
-            if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer[P.x + P.y * image.get_width()] > frag_depth) continue;
+            // interpolate z
+            float z = screen_coords[0][2] * c.x + screen_coords[1][2] * c.y + screen_coords[2][2] * c.z;
+            if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer[P.x + P.y * image.get_width()] > z) continue;
             bool discard = shader.fragment(c, color);
             if (!discard) {
-                zbuffer[P.x + P.y * image.get_width()] = frag_depth;
+                zbuffer[P.x + P.y * image.get_width()] = z;
                 image.set(P.x, P.y, colored ? color : white);
             }
         }

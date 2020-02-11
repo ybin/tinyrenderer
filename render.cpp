@@ -7,24 +7,24 @@
 #include "shader.h"
 #include "render.h"
 
-void points_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer) {
+void points_interpolator(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer) {
     const TGAColor white(255, 255, 255);
-    for (auto &pt : pts) {
-        image.set(static_cast<int>(pt[0] / pt[3]), static_cast<int>(pt[1] / pt[3]), white);
+    for (auto &pt : screen_coords) {
+        image.set(static_cast<int>(pt[0]), static_cast<int>(pt[1]), white);
     }
 }
 
-void line_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer) {
+void line_interpolator(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer) {
     const TGAColor white(255, 255, 255);
     const int len = 100;
     const float step = 1.f / len;
     int k;
     float t;
     Vec2i v0, v1;
-    for (size_t i = 0, j = 0; i < pts.size(); ++i) {
-        j = (i + 1) % pts.size();
-        v0 = proj<2>(pts[i] / pts[i][3]);
-        v1 = proj<2>(pts[j] / pts[j][3]);
+    for (size_t i = 0, j = 0; i < screen_coords.size(); ++i) {
+        j = (i + 1) % screen_coords.size();
+        v0 = proj<2>(screen_coords[i]);
+        v1 = proj<2>(screen_coords[j]);
         k = 0;
         t = 0.f;
         while (k++ < len) {
@@ -36,14 +36,21 @@ void line_interpolator(const std::vector<Vec4f> &pts, IShader &shader, TGAImage 
     }
 }
 
+void triangle_interpolator(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer) {
+    triangle(screen_coords, shader, image, zbuffer, false);
+}
+
+void default_interpolator(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer) {
+    triangle(screen_coords, shader, image, zbuffer);
+}
+
 void render(const std::vector<std::string> objs,
             const int width, const int height,
             const Vec3f &eye, const Vec3f &center, const Vec3f &up,
-            const std::string &output,
-            Interpolator interpolator) {
-    auto MV = lookat(eye, center, up);
-    auto VP = viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
+            const std::string &output, Interpolator interpolator) {
+    auto V = lookat(eye, center, up);
     auto P = projection(-1.f / (eye - center).norm());
+    auto VP = viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
 //    auto P = frustum(-1, 1, 1, -1, 1, 3);
     TGAImage framebuffer(width, height, TGAImage::RGB);
     std::vector<float> zbuffer(static_cast<unsigned long>(width * height));
@@ -52,12 +59,16 @@ void render(const std::vector<std::string> objs,
         Model model(obj.data());
         NoLightShader shader;
         shader.set_model(&model);
-        shader.set_mvp(VP * P * MV);
-        std::vector<Vec4f> screen_coords(3);
+        shader.set_mvp(P * V);
+        std::vector<Vec3f> screen_coords(3);
+        Vec4f v;
         for (int i = 0; i < model.nfaces(); i++) {
             screen_coords.clear();
             for (int j = 0; j < 3; j++) {
-                screen_coords.emplace_back(shader.vertex(i, j));
+                v = shader.vertex(i, j);
+                v = v / v[3];
+                v = VP * v;
+                screen_coords.emplace_back(proj<3>(v));
             }
             interpolator(screen_coords, shader, framebuffer, zbuffer.data());
         }

@@ -16,9 +16,7 @@ struct IShader {
     virtual bool fragment(Vec3f bar, TGAColor &color) = 0;
 };
 
-typedef void (*Interpolator)(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer);
-
-void triangle(const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer, bool colored = true);
+void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer, bool colored = true);
 
 /*
 void triangle(mat<4, 3, float> &pts, IShader &shader, TGAImage &image, float *zbuffer, bool colored = true);

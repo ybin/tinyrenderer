@@ -31,10 +31,7 @@ int main(int argc, char **argv) {
 
     render(objs, width, height, eye, center, up, "line.tga", line_interpolator);
 
-    render(objs, width, height, eye, center, up, "triangle.tga",
-           [](const std::vector<Vec4f> &pts, IShader &shader, TGAImage &image, float *zbuffer) {
-               triangle(pts, shader, image, zbuffer, false);
-           });
+    render(objs, width, height, eye, center, up, "triangle.tga", triangle_interpolator);
 
     render(objs, width, height, eye, center, up);
 
