@@ -38,6 +38,16 @@ float perspective_interpolate_z(const std::vector<Vec3f> &screen_coords, Vec3f &
     return z;
 }
 
+// https://codeplea.com/triangular-interpolation
+Vec3f barycentric2(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
+    float u, v;
+    u = ((B.y - C.y) * (P.x - C.x) + (C.x - B.x) * (P.y - C.y)) /
+            ((B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y));
+    v = ((C.y - A.y) * (P.x - C.x) + (A.x - C.x) * (P.y - C.y)) /
+            ((B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y));
+    return {u, v, 1 - u - v};
+}
+
 void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
     auto MAX = std::numeric_limits<float>::max();
     float l, t, r, b;
@@ -55,10 +65,10 @@ void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage
     const TGAColor white = {255, 255, 255, 255};
     for (P.x = static_cast<int>(l); P.x <= r; P.x++) {
         for (P.y = static_cast<int>(b); P.y <= t; P.y++) {
-            Vec3f c = barycentric(proj<2>(screen_coords[0]),
-                                  proj<2>(screen_coords[1]),
-                                  proj<2>(screen_coords[2]),
-                                  P);
+            Vec3f c = barycentric2(proj<2>(screen_coords[0]),
+                                   proj<2>(screen_coords[1]),
+                                   proj<2>(screen_coords[2]),
+                                   P);
             float z = perspective_interpolate_z(screen_coords, c);
             if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer[P.x + P.y * image.get_width()] > z) continue;
             bool discard = shader.fragment(c, color);
