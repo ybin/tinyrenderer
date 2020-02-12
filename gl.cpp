@@ -16,6 +16,28 @@ Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     return {-1, 1, 1}; // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
+float linear_interpolate_z(const std::vector<Vec3f> &screen_coords, const Vec3f &c) {
+    float z = 0.f;
+    for (int i = 0; i < 3; ++i) {
+        z += c[i] * screen_coords[i].z;
+    }
+    return z;
+}
+
+float perspective_interpolate_z(const std::vector<Vec3f> &screen_coords, Vec3f &c) {
+    float z = 0.f;
+    for (int i = 0; i < 3; ++i) {
+        z += c[i] / screen_coords[i].z;
+    }
+    z = 1 / z;
+
+    for (int i = 0; i < 3; ++i) {
+        c[i] *= z / screen_coords[i].z;
+    }
+
+    return z;
+}
+
 void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
     auto MAX = std::numeric_limits<float>::max();
     float l, t, r, b;
@@ -37,8 +59,7 @@ void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage
                                   proj<2>(screen_coords[1]),
                                   proj<2>(screen_coords[2]),
                                   P);
-            // interpolate z
-            float z = screen_coords[0][2] * c.x + screen_coords[1][2] * c.y + screen_coords[2][2] * c.z;
+            float z = perspective_interpolate_z(screen_coords, c);
             if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer[P.x + P.y * image.get_width()] > z) continue;
             bool discard = shader.fragment(c, color);
             if (!discard) {

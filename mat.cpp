@@ -24,9 +24,11 @@ Matrix viewport(int x, int y, int w, int h) {
 }
 
 Matrix projection(float coeff) {
-    Matrix Projection = Matrix::identity();
-    Projection[3][2] = coeff;
-    return Projection;
+    Matrix p = Matrix::identity();
+    p[2][3] = coeff;
+    p[3][2] = -1 / coeff;
+    p[3][3] = 0;
+    return p;
 }
 
 Matrix frustum(float l, float t, float r, float b, float n, float f) {
@@ -54,7 +56,7 @@ Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
     linearTransform.set_col(2, embed<4>(z, 0.f));
 
     // translate to eye position
-//    translate.set_col(3, embed<4>(eye));
+    translate.set_col(3, embed<4>(eye));
 
     return (translate * linearTransform).invert();
 }
