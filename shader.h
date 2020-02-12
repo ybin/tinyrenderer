@@ -112,3 +112,127 @@ public:
         return false;
     }
 };
+
+class NormalShader : public IShader {
+    mat<2, 3, float> varying_uv;  // triangle uv coordinates, written by the vertex shader, read by the fragment shader
+    mat<3, 3, float> varying_nrm; // normal per vertex to be interpolated by FS
+    mat<3, 3, float> varying_tri;
+    Model *model = nullptr;
+    Matrix mvp;
+    Vec3f light_dir = {1, 1, 1};
+    Matrix mvp_i;
+
+public:
+    void set_mvp(Matrix mvp) override {
+        this->mvp = mvp;
+        mvp_i = mvp.invert_transpose();
+    }
+
+    void set_model(Model *model) override {
+        this->model = model;
+    }
+
+    Vec4f vertex(int iface, int nthvert) override {
+        varying_uv.set_col(nthvert, model->uv(iface, nthvert));
+        varying_nrm.set_col(nthvert, proj<3>(mvp_i * embed<4>(model->normal(iface, nthvert), 0.f)));
+        varying_tri.set_col(nthvert, model->vert(iface, nthvert));
+        Vec4f gl_Vertex = mvp * embed<4>(model->vert(iface, nthvert));
+        return gl_Vertex;
+    }
+
+    bool fragment(Vec3f bar, TGAColor &color) override {
+        Vec3f vn = varying_nrm[0];//(varying_nrm * bar).normalize();
+        Vec2f uv = varying_uv * bar;
+
+        mat<2, 3, float> edge;
+        edge[0] = varying_tri[1] - varying_tri[0];
+        edge[1] = varying_tri[2] - varying_tri[0];
+        auto deltaUV0 = varying_uv.col(1) - varying_uv.col(0);
+        auto deltaUV1 = varying_uv.col(2) - varying_uv.col(0);
+
+        auto deltaU1 = deltaUV0.x;
+        auto deltaV1 = deltaUV0.y;
+        auto deltaU2 = deltaUV1.x;
+        auto deltaV2 = deltaUV1.y;
+
+        float tmp = (deltaU1 * deltaV2 - deltaU2 * deltaV1);
+        mat<2, 2, float> c;
+        c[0][0] = deltaV2 / tmp;
+        c[0][1] = -deltaV1 / tmp;
+        c[1][0] = -deltaU2 / tmp;
+        c[1][1] = deltaV1 / tmp;
+
+        mat<2, 3, float> tb;
+        tb.set_col(0, c * edge.col(0));
+        tb.set_col(1, c * edge.col(1));
+        tb.set_col(2, c * edge.col(2));
+
+        mat<3, 3, float> TBN;
+        TBN.set_col(0, tb[0].normalize());
+        TBN.set_col(1, tb[1].normalize());
+        TBN.set_col(2, vn.normalize());
+
+        Vec3f n = (TBN * model->normal(uv)).normalize();
+        color = model->diffuse(uv) * std::max(0.f, n * light_dir.normalize());
+
+        return false;
+    }
+};
+
+struct TangentShader : public IShader {
+    mat<2, 3, float> varying_uv;  // triangle uv coordinates, written by the vertex shader, read by the fragment shader
+    mat<4, 3, float> varying_tri; // triangle coordinates (clip coordinates), written by VS, read by FS
+    mat<3, 3, float> varying_nrm; // normal per vertex to be interpolated by FS
+    mat<3, 3, float> ndc_tri;     // triangle in normalized device coordinates
+    Model *model = nullptr;
+    Vec3f light_dir = {1, 1, 1};
+    Matrix mvp;
+    Matrix mvp_i;
+
+public:
+    void set_mvp(Matrix mvp) override {
+        this->mvp = mvp;
+        mvp_i = mvp.invert_transpose();
+    }
+
+    void set_model(Model *model) override {
+        this->model = model;
+    }
+
+    Vec4f vertex(int iface, int nthvert) override {
+        varying_uv.set_col(nthvert, model->uv(iface, nthvert));
+        varying_nrm.set_col(nthvert, proj<3>((mvp).invert_transpose() *
+                                             embed<4>(model->normal(iface, nthvert), 0.f)));
+        Vec4f gl_Vertex = mvp * embed<4>(model->vert(iface, nthvert));
+        varying_tri.set_col(nthvert, gl_Vertex);
+        ndc_tri.set_col(nthvert, proj<3>(gl_Vertex / gl_Vertex[3]));
+        light_dir = proj<3>(mvp * embed<4>(light_dir, 0.f)).normalize();
+        return gl_Vertex;
+    }
+
+    bool fragment(Vec3f bar, TGAColor &color) override {
+        Vec3f bn = (varying_nrm[0]).normalize();
+        Vec2f uv = varying_uv * bar;
+
+        mat<3, 3, float> A;
+        A[0] = ndc_tri.col(1) - ndc_tri.col(0);
+        A[1] = ndc_tri.col(2) - ndc_tri.col(0);
+        A[2] = bn;
+
+        mat<3, 3, float> AI = A.invert();
+
+        Vec3f i = AI * Vec3f(varying_uv[0][1] - varying_uv[0][0], varying_uv[0][2] - varying_uv[0][0], 0);
+        Vec3f j = AI * Vec3f(varying_uv[1][1] - varying_uv[1][0], varying_uv[1][2] - varying_uv[1][0], 0);
+
+        mat<3, 3, float> B;
+        B.set_col(0, i.normalize());
+        B.set_col(1, j.normalize());
+        B.set_col(2, bn);
+
+        Vec3f n = (B * model->normal(uv)).normalize();
+
+        color = model->diffuse(uv) * std::max(0.f, n * light_dir);
+
+        return false;
+    }
+};

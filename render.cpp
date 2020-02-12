@@ -57,7 +57,7 @@ void render(const std::vector<std::string> objs,
 
     for (auto &obj : objs) {
         Model model(obj.data());
-        NoLightShader shader;
+        TangentShader shader;
         shader.set_model(&model);
         shader.set_mvp(P * V);
         std::vector<Vec3f> screen_coords(3);
