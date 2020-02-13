@@ -24,6 +24,7 @@ float linear_interpolate_z(const std::vector<Vec3f> &screen_coords, const Vec3f 
     return z;
 }
 
+// https://zhuanlan.zhihu.com/p/50141767
 float perspective_interpolate_z(const std::vector<Vec3f> &screen_coords, Vec3f &c) {
     float z = 0.f;
     for (int i = 0; i < 3; ++i) {
