@@ -5,7 +5,7 @@ Matrix viewport(int x, int y, int w, int h) {
     // [-1, 1] => [0, 2]
     Matrix translate = Matrix::identity();
     translate[0][3] = translate[1][3] = 1;
-    translate[2][3] = 1; // WHY this matters
+    translate[2][3] = 1; // make sure z > 0, because of the interpolation correction in triangle interpolation
 
     // [0, 2] => [0, 1]
     Matrix scale = Matrix::identity();
@@ -41,7 +41,12 @@ Matrix frustum(float l,float r, float b, float t, float n, float f) {
     p[2][2] = -(f + n) / (f - n);
     p[2][3] = -2 * f * n / (f - n);
     p[3][2] = -1;
-    return p;
+
+    // ugly correction, otherwise triangle interpolation must change the zbuffer order,
+    // but that make the result worse, WHY?!
+    auto q = Matrix::identity();
+    q[2][2] = -1;
+    return q * p;
 }
 
 Matrix lookat2(Vec3f eye, Vec3f center, Vec3f up) {
