@@ -24,6 +24,7 @@ Matrix viewport(int x, int y, int w, int h) {
     return offset * wh * scale * translate;
 }
 
+/* left-hand coordinates */
 Matrix projection(float coeff) {
     Matrix p = Matrix::identity();
     p[2][3] = coeff;
@@ -42,8 +43,9 @@ Matrix frustum(float l,float r, float b, float t, float n, float f) {
     p[2][3] = -2 * f * n / (f - n);
     p[3][2] = -1;
 
-    // ugly correction, otherwise triangle interpolation must change the zbuffer order,
-    // but that make the result worse, WHY?!
+    // this make the z order to right-hand coordinate,
+    // otherwise it's left-hand coordinate(opengl)
+    // but the result is a little worse, WHY?!
     auto q = Matrix::identity();
     q[2][2] = -1;
     return q * p;

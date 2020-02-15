@@ -9,7 +9,7 @@
 void glRender(const std::vector<std::string> objs,
               const int width, const int height,
               const Vec3f &eye, const Vec3f &center, const Vec3f &up,
-              const GL::Renderer renderer, const std::string &output) {
+              const GL::RendererType renderer, const std::string &output) {
     auto V = lookat(eye, center, up);
 //    auto P = projection((eye - center).norm());
     auto len = 1 - 1 / (eye - center).norm();
