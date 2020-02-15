@@ -66,6 +66,10 @@ public:
         this->mvp = mvp;
     }
 
+    Model *get_model() override {
+        return model;
+    }
+
     void set_model(Model *model) override {
         this->model = model;
     }
@@ -94,6 +98,10 @@ private:
 public:
     void set_mvp(Matrix mvp) override {
         this->mvp = mvp;
+    }
+
+    Model *get_model() override {
+        return model;
     }
 
     void set_model(Model *model) override {
@@ -129,6 +137,10 @@ public:
 
     void set_model(Model *model) override {
         this->model = model;
+    }
+
+    Model *get_model() override {
+        return model;
     }
 
     Vec4f vertex(int iface, int nthvert) override {

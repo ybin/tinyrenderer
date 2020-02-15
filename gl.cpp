@@ -3,54 +3,24 @@
 #include <cstdlib>
 #include "gl.h"
 
-Vec3f barycentric(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
-    Vec3f s[2];
-    for (int i = 2; i--;) {
-        s[i][0] = C[i] - A[i];
-        s[i][1] = B[i] - A[i];
-        s[i][2] = A[i] - P[i];
+void GL::glDraw() {
+    std::vector<Vec3f> screen_coords(3);
+    Vec4f v;
+    Model *model = shader->get_model();
+    for (int i = 0; i < model->nfaces(); i++) {
+        screen_coords.clear();
+        for (int j = 0; j < 3; j++) {
+            v = shader->vertex(i, j);
+            v = v / v[3];
+            v = viewportMat * v;
+            screen_coords.emplace_back(proj<3>(v));
+        }
+        (this->*interpolator)(screen_coords);
     }
-    Vec3f u = cross(s[0], s[1]);
-    if (std::abs(u[2]) > 1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
-        return {1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z};
-    return {-1, 1, 1}; // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-float linear_interpolate_z(const std::vector<Vec3f> &screen_coords, const Vec3f &c) {
-    float z = 0.f;
-    for (int i = 0; i < 3; ++i) {
-        z += c[i] * screen_coords[i].z;
-    }
-    return z;
-}
-
-// https://zhuanlan.zhihu.com/p/50141767
-float perspective_interpolate_z(const std::vector<Vec3f> &screen_coords, Vec3f &c) {
-    float z = 0.f;
-    for (int i = 0; i < 3; ++i) {
-        z += c[i] / screen_coords[i].z;
-    }
-    z = 1 / z;
-
-    for (int i = 0; i < 3; ++i) {
-        c[i] *= z / screen_coords[i].z;
-    }
-
-    return z;
-}
-
-// https://codeplea.com/triangular-interpolation
-Vec3f barycentric2(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
-    float u, v;
-    u = ((B.y - C.y) * (P.x - C.x) + (C.x - B.x) * (P.y - C.y)) /
-            ((B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y));
-    v = ((C.y - A.y) * (P.x - C.x) + (A.x - C.x) * (P.y - C.y)) /
-            ((B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y));
-    return {u, v, 1 - u - v};
-}
-
-void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer,
-        bool colored, DepthTestFunc depthTest) {
+void GL::triangle(const std::vector<Vec3f> &screen_coords, IShader *shader, TGAImage *image,
+                  float *zbuffer, bool colored, GL::DepthTestFunc depthTest) {
     auto MAX = std::numeric_limits<float>::max();
     float l, t, r, b;
     l = b = MAX;
@@ -72,50 +42,65 @@ void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage
                                    proj<2>(screen_coords[2]),
                                    P);
             float z = perspective_interpolate_z(screen_coords, c);
-            if (c.x < 0 || c.y < 0 || c.z < 0 || !depthTest(zbuffer[P.x + P.y * image.get_width()], z)) continue;
-            bool discard = shader.fragment(c, color);
+            if (c.x < 0 || c.y < 0 || c.z < 0 || !depthTest(zbuffer[P.x + P.y * image->get_width()], z)) continue;
+            bool discard = shader->fragment(c, color);
             if (!discard) {
-                zbuffer[P.x + P.y * image.get_width()] = z;
-                image.set(P.x, P.y, colored ? color : white);
+                zbuffer[P.x + P.y * image->get_width()] = z;
+                image->set(P.x, P.y, colored ? color : white);
             }
         }
     }
 }
 
-/*
-void triangle(mat<4, 3, float> &clipc, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
-    mat<3, 4, float> pts = (Viewport * clipc).transpose(); // transposed to ease access to each of the points
-    mat<3, 2, float> pts2;
-    for (int i = 0; i < 3; i++) pts2[i] = proj<2>(pts[i] / pts[i][3]);
-
-    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
-    Vec2f bboxmax(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
-    Vec2f clamp(image.get_width() - 1, image.get_height() - 1);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 2; j++) {
-            bboxmin[j] = std::max(0.f, std::min(bboxmin[j], pts2[i][j]));
-            bboxmax[j] = std::min(clamp[j], std::max(bboxmax[j], pts2[i][j]));
-        }
-    }
-    Vec2i P;
-    TGAColor color;
-    TGAColor white = {255, 255, 255, 255};
-    for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x++) {
-        for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++) {
-            Vec3f bc_screen = barycentric(pts2[0], pts2[1], pts2[2], P);
-            Vec3f bc_clip = Vec3f(bc_screen.x / pts[0][3], bc_screen.y / pts[1][3], bc_screen.z / pts[2][3]);
-            bc_clip = bc_clip / (bc_clip.x + bc_clip.y + bc_clip.z);
-            float frag_depth = clipc[2] * bc_clip;
-            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0 ||
-                zbuffer[P.x + P.y * image.get_width()] > frag_depth)
-                continue;
-            bool discard = shader.fragment(bc_clip, color);
-            if (!discard) {
-                zbuffer[P.x + P.y * image.get_width()] = frag_depth;
-                image.set(P.x, P.y, colored ? color : white);
-            }
+void GL::line_interpolator(const std::vector<Vec3f> &screen_coords) {
+    const TGAColor white(255, 255, 255);
+    const int len = 100;
+    const float step = 1.f / len;
+    int k;
+    float t;
+    Vec2i v0, v1;
+    for (size_t i = 0, j = 0; i < screen_coords.size(); ++i) {
+        j = (i + 1) % screen_coords.size();
+        v0 = proj<2>(screen_coords[i]);
+        v1 = proj<2>(screen_coords[j]);
+        k = 0;
+        t = 0.f;
+        while (k++ < len) {
+            framebuffer->set(static_cast<int>(v0.x + (v1.x - v0.x) * t),
+                             static_cast<int>(v0.y + (v1.y - v0.y) * t),
+                             white);
+            t += step;
         }
     }
 }
-*/
 
+void
+GL::points_interpolator(const std::vector<Vec3f> &screen_coords) {
+    const TGAColor white(255, 255, 255);
+    for (auto &pt : screen_coords) {
+        framebuffer->set(static_cast<int>(pt[0]), static_cast<int>(pt[1]), white);
+    }
+}
+
+void
+GL::triangle_interpolator(const std::vector<Vec3f> &screen_coords) {
+    switch (depthFunc) {
+        case LESS:
+            triangle(screen_coords, shader, framebuffer, zbuffer.data(), false, depth_less);
+            break;
+        case GREATER:
+            triangle(screen_coords, shader, framebuffer, zbuffer.data(), false, depth_more);
+            break;
+    }
+}
+
+void GL::default_interpolator(const std::vector<Vec3f> &screen_coords) {
+    switch (depthFunc) {
+        case LESS:
+            triangle(screen_coords, shader, framebuffer, zbuffer.data(), true, depth_less);
+            break;
+        case GREATER:
+            triangle(screen_coords, shader, framebuffer, zbuffer.data(), true, depth_more);
+            break;
+    }
+}
