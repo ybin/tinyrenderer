@@ -49,7 +49,8 @@ Vec3f barycentric2(Vec2f A, Vec2f B, Vec2f C, Vec2f P) {
     return {u, v, 1 - u - v};
 }
 
-void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer, bool colored) {
+void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage &image, float *zbuffer,
+        bool colored, DepthTestFunc depthTest) {
     auto MAX = std::numeric_limits<float>::max();
     float l, t, r, b;
     l = b = MAX;
@@ -71,7 +72,7 @@ void triangle(const std::vector<Vec3f> &screen_coords, IShader &shader, TGAImage
                                    proj<2>(screen_coords[2]),
                                    P);
             float z = perspective_interpolate_z(screen_coords, c);
-            if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer[P.x + P.y * image.get_width()] > z) continue;
+            if (c.x < 0 || c.y < 0 || c.z < 0 || !depthTest(zbuffer[P.x + P.y * image.get_width()], z)) continue;
             bool discard = shader.fragment(c, color);
             if (!discard) {
                 zbuffer[P.x + P.y * image.get_width()] = z;

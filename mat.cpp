@@ -9,7 +9,7 @@ Matrix viewport(int x, int y, int w, int h) {
 
     // [0, 2] => [0, 1]
     Matrix scale = Matrix::identity();
-    scale[0][0] = scale[1][1] = 0.5f;
+    scale[0][0] = scale[1][1] = scale[2][2] = 0.5f;
 
     // [0, 1] => [0, w], [0, h]
     Matrix wh = Matrix::identity();

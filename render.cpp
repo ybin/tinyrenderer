@@ -50,7 +50,8 @@ void render(const std::vector<std::string> objs,
             const std::string &output, Interpolator interpolator) {
     auto V = lookat(eye, center, up);
 //    auto P = projection((eye - center).norm());
-    auto P = frustum(-1, 1, -1, 1, (eye - center).norm(), (eye - center).norm() + 2);
+    auto len = 1 - 1 / (eye - center).norm();
+    auto P = frustum(-len, len, -len, len, (eye - center).norm() - 1, (eye - center).norm() + 1);
     auto VP = viewport(width / 8, height / 8, width * 3 / 4, height * 3 / 4);
     TGAImage framebuffer(width, height, TGAImage::RGB);
     std::vector<float> zbuffer(static_cast<unsigned long>(width * height));
