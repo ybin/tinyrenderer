@@ -152,40 +152,56 @@ public:
         return gl_Vertex;
     }
 
-    bool fragment(Vec3f bar, TGAColor &color) override {
+#define BUMP_NORMAL 1
+    mat<3, 3, float> compute_tbn_mat(const Vec3f &bar) {
         Vec3f vn = (varying_nrm * bar).normalize();
-        Vec2f uv = varying_uv * bar;
+        mat<3, 3, float> TBN;
+        TBN.set_col(2, vn);
 
+#if (BUMP_NORMAL == 0)
+        Vec3f deltaPos1 = varying_tri.col(1) - varying_tri.col(0);
+        Vec3f deltaPos2 = varying_tri.col(2) - varying_tri.col(0);
+        Vec2f deltaUV1 = varying_uv.col(1) - varying_uv.col(0);
+        Vec2f deltaUV2 = varying_uv.col(2) - varying_uv.col(0);
+        float r = 1 / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+        Vec3f tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
+        Vec3f bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+        TBN.set_col(0, tangent.normalize());
+        TBN.set_col(1, bitangent.normalize());
+#elif (BUMP_NORMAL == 1)
         mat<3, 3, float> Q; // make sure in World Space(or Tangent Space)
         Q[0] = varying_tri.col(1) - varying_tri.col(0);
         Q[1] = varying_tri.col(2) - varying_tri.col(0);
         Q[2] = vn;
-
-        mat<3, 3, float> TBN;
-        TBN.set_col(2, vn);
-
-
-
-//        mat<3, 3, float> UV;
-//        UV[0] = embed<3>(varying_uv.col(1) - varying_uv.col(0), 0.f);
-//        UV[1] = embed<3>(varying_uv.col(2) - varying_uv.col(0), 0.f);
-//        UV[2] = Vec3f(0, 0, 1);
-//        Q = Q.transpose();
-//        UV = UV.transpose();
-//        auto T_ = Q * UV.col(0);
-//        auto T = T_ - varying_nrm.col(0).normalize() * (T_ * varying_nrm.col(0).normalize());
-//        TBN.set_col(0, T);
-//        TBN.set_col(1, cross(vn, T));
-
-
         mat<3, 3, float> AI = Q.invert();
         Vec3f i = AI * Vec3f(varying_uv[0][1] - varying_uv[0][0], varying_uv[0][2] - varying_uv[0][0], 0);
         Vec3f j = AI * Vec3f(varying_uv[1][1] - varying_uv[1][0], varying_uv[1][2] - varying_uv[1][0], 0);
         TBN.set_col(0, i.normalize());
         TBN.set_col(1, j.normalize());
+#elif (BUMP_NORMAL == 2)
+        /*
+         * World Space vectors:   e1 = AB, e2 = AC (vertex coordinate)
+         * and the corresponding
+         * Tangent Space vectors: v1 = AB, v2 = AC (uv coordinate)
+         * The tangent space base vectors: t, b, n (the vertex normal vector of CURRENT pixel),
+         * then
+         * e1 = x * t + y * b + z * n, x, y, z are scalars, t, b, n are vectors. Then
+         * e1 * t = x * t * t + 0 + 0 => x = e1 * t, y, z are same:
+         * x = e1 * t
+         * y = e1 * b
+         * z = e1 * n
+         * because the corresponding vector os e1 is v1 (in tangent space), so,
+         * x = v1.x
+         * y = v1.y
+         * z = v1.z
+         */
+#endif
+        return TBN;
+    }
 
-
-        Vec3f n = (TBN * model->normal(uv)).normalize();
+    bool fragment(Vec3f bar, TGAColor &color) override {
+        Vec2f uv = varying_uv * bar;
+        Vec3f n = (compute_tbn_mat(bar) * model->normal(uv)).normalize();
         color = model->diffuse(uv) * std::max(0.f, n * light_dir);
 
         return false;
