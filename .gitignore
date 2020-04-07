@@ -3,3 +3,5 @@ framebuffer.tga
 main
 .idea/
 cmake-build-debug/
+build/
+.theia/
